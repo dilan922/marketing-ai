@@ -1209,24 +1209,40 @@ function downloadImagen() {
 }
 
 // ── Keys Status ─────────────────────────────────────────────
+function renderKeyDots(keys, label) {
+  const activas = keys.filter(k => !k.agotada).length
+  return `
+    <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px">${label} — ${activas}/${keys.length} disponibles</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+      ${keys.map(k => `
+        <div title="Key #${k.numero} — ${k.agotada ? `Sin créditos (~${k.horasRestantes}h)` : 'Disponible'}"
+          style="width:24px;height:24px;border-radius:6px;background:${k.agotada ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'};
+          border:1px solid ${k.agotada ? 'var(--red)' : 'var(--green)'};display:flex;align-items:center;justify-content:center;
+          font-size:9px;font-weight:700;color:${k.agotada ? '#FCA5A5' : '#6EE7B7'};cursor:default">${k.numero}</div>
+      `).join('')}
+    </div>`
+}
+
 async function actualizarMiniKeys() {
   try {
     const res = await fetch('/api/video/keys-status')
-    const keys = await res.json()
-    const activas = keys.filter(k => !k.agotada).length
-    document.getElementById('keys-info').textContent = `${activas}/${keys.length} keys activas`
+    const data = await res.json()
+
+    const mhKeys = data.magichour || []
+    const falKeys = data.fal || []
+    const mhActivas = mhKeys.filter(k => !k.agotada).length
+    const falActivas = falKeys.filter(k => !k.agotada).length
+    const totalActivas = mhActivas + falActivas
+
+    document.getElementById('keys-info').textContent = `${totalActivas} keys activas (Fal+MH)`
 
     const mini = document.getElementById('mini-keys')
-    mini.innerHTML = keys.map(k => `
-      <div title="Key #${k.numero} — ${k.agotada ? `Sin créditos (~${k.horasRestantes}h)` : 'Disponible'}"
-        style="width:28px;height:28px;border-radius:8px;background:${k.agotada ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'};
-        border:1px solid ${k.agotada ? 'var(--red)' : 'var(--green)'};display:flex;align-items:center;justify-content:center;
-        font-size:10px;font-weight:700;color:${k.agotada ? '#FCA5A5' : '#6EE7B7'};cursor:default">${k.numero}</div>
-    `).join('')
+    mini.innerHTML =
+      (falKeys.length ? renderKeyDots(falKeys, '⚡ Fal.ai') : '<div style="font-size:11px;color:var(--muted)">Agrega FAL_KEY_1…N en Render para usar Fal.ai</div>') +
+      (mhKeys.length ? renderKeyDots(mhKeys, '🎬 Magic Hour') : '')
 
-    // Mostrar botón reset solo si todas están agotadas
     const btnReset = document.getElementById('btn-reset-keys')
-    if (btnReset) btnReset.style.display = activas === 0 ? 'block' : 'none'
+    if (btnReset) btnReset.style.display = totalActivas === 0 ? 'block' : 'none'
   } catch {}
 }
 

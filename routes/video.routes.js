@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { crearVideo, esperarVideo, getKeysStatus, resetKeys, testKeys } from '../services/magichour.js'
+import { crearVideo, getKeysStatus, resetKeys, estadoVideo } from '../services/magichour.js'
+import { crearVideoFal, estadoVideoFal, getFalKeysStatus, resetFalKeys } from '../services/falai.js'
 import { generarAudio } from '../services/elevenlabs.js'
 import { transcribirConTimestamps, quemarSubtitulos, generarSRT, ffmpegDisponible } from '../services/subtitles.js'
 import { mezclarMusica } from '../services/audiomix.js'
@@ -8,79 +9,88 @@ import { mezclarMusica } from '../services/audiomix.js'
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
+// Mapa en memoria: jobId → { provider, modelId, key }
+const jobMeta = new Map()
+
+// Estado de keys (Fal + Magic Hour)
 router.get('/keys-status', (req, res) => {
-  res.json(getKeysStatus())
+  res.json({
+    magichour: getKeysStatus(),
+    fal: getFalKeysStatus(),
+  })
 })
 
 router.post('/reset-keys', (req, res) => {
   resetKeys()
-  res.json({ ok: true, keys: getKeysStatus() })
+  resetFalKeys()
+  res.json({ ok: true, magichour: getKeysStatus(), fal: getFalKeysStatus() })
 })
 
-// Diagnóstico: prueba cada key sin gastar créditos
-router.get('/test-keys', async (req, res) => {
-  try {
-    const results = await testKeys()
-    res.json(results)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Generar video (text-to-video o image-to-video)
+// Generar video: Fal.ai primero, Magic Hour como respaldo
 router.post('/generate', upload.single('imagen'), async (req, res) => {
-  const { prompt, duracion = 10, modelo = 'kling-3.0', aspectRatio = '9:16', guion } = req.body
-
+  const { prompt, duracion = 5, modelo = 'ltx-2', aspectRatio = '9:16' } = req.body
   if (!prompt) return res.status(400).json({ error: 'El prompt es obligatorio' })
 
+  const imageBuffer = req.file ? req.file.buffer : null
+  const imageExt = req.file ? (req.file.mimetype.split('/')[1] || 'jpg') : 'jpg'
+  const dur = Math.min(Math.max(parseInt(duracion), 1), 30)
+
   try {
-    // Upload + creación de video en un solo paso con retry automático por key
-    const imageBuffer = req.file ? req.file.buffer : null
-    const imageExt = req.file ? (req.file.mimetype.split('/')[1] || 'jpg') : 'jpg'
+    // 1. Intentar con Fal.ai
+    const falResult = await crearVideoFal({ prompt, imageBuffer, imageExt, duracion: dur, modelo, aspectRatio })
 
-    const { id } = await crearVideo({
-      prompt,
-      imageBuffer,
-      imageExt,
-      duracion: Math.min(Math.max(parseInt(duracion), 1), 60),
-      modelo,
-      aspectRatio,
-    })
+    if (falResult) {
+      const jobId = `fal_${falResult.requestId}`
+      jobMeta.set(jobId, { provider: 'fal', modelId: falResult.modelId, key: falResult.key })
+      return res.json({ ok: true, jobId, provider: 'fal', mensaje: 'Video en cola en Fal.ai...' })
+    }
 
-    res.json({ ok: true, jobId: id, mensaje: 'Video en cola, consultando estado...' })
+    // 2. Fal sin keys → intentar Magic Hour
+    console.log('[VIDEO] Fal.ai sin keys, intentando Magic Hour...')
+    const mhResult = await crearVideo({ prompt, imageBuffer, imageExt, duracion: dur, modelo, aspectRatio })
+    const jobId = `mh_${mhResult.id}`
+    jobMeta.set(jobId, { provider: 'magichour' })
+    return res.json({ ok: true, jobId, provider: 'magichour', mensaje: 'Video en cola en Magic Hour...' })
+
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// Consultar estado de un job
-router.get('/status/:id', async (req, res) => {
+// Consultar estado (detecta proveedor por prefijo del jobId)
+router.get('/status/:jobId', async (req, res) => {
+  const { jobId } = req.params
+  const meta = jobMeta.get(jobId)
+
   try {
-    const { estadoVideo } = await import('../services/magichour.js')
-    const data = await estadoVideo(req.params.id)
-    res.json({
+    if (jobId.startsWith('fal_') && meta) {
+      const requestId = jobId.replace('fal_', '')
+      const data = await estadoVideoFal(requestId, meta.modelId, meta.key)
+      return res.json(data)
+    }
+
+    // Magic Hour (prefijo mh_ o ids legacy)
+    const mhId = jobId.replace('mh_', '')
+    const data = await estadoVideo(mhId)
+    return res.json({
       status: data.status,
       downloadUrl: data.downloads?.[0]?.url || null,
-      credits: data.credits_charged,
     })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// Generar audio desde guión + subtítulos + combinar con video
+// Generar audio + subtítulos
 router.post('/audio-subtitulos', upload.single('video'), async (req, res) => {
   const { guion, conSubtitulos = 'true' } = req.body
   if (!guion) return res.status(400).json({ error: 'El guión es obligatorio' })
   if (!req.file) return res.status(400).json({ error: 'El video es obligatorio' })
 
   try {
-    // 1. Generar audio con ElevenLabs
     const audioBuffer = await generarAudio(guion)
-
     let videoFinal = req.file.buffer
 
-    // 2. Si FFmpeg está disponible, combinar video + audio + subtítulos
     if (conSubtitulos === 'true' && await ffmpegDisponible()) {
       const words = await transcribirConTimestamps(audioBuffer, 'audio/mpeg')
       if (words.length > 0) {
@@ -88,17 +98,13 @@ router.post('/audio-subtitulos', upload.single('video'), async (req, res) => {
       }
     }
 
-    res.set({
-      'Content-Type': 'video/mp4',
-      'Content-Disposition': `attachment; filename="video_con_audio.mp4"`,
-    })
+    res.set({ 'Content-Type': 'video/mp4', 'Content-Disposition': 'attachment; filename="video_con_audio.mp4"' })
     res.send(videoFinal)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// Solo generar subtítulos SRT desde audio
 router.post('/subtitulos', upload.single('audio'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Audio obligatorio' })
   try {
@@ -111,30 +117,17 @@ router.post('/subtitulos', upload.single('audio'), async (req, res) => {
   }
 })
 
-// Mezclar video con música de fondo (ducking 15%)
-// Body: { videoUrl, musicUrl }
 router.post('/mix-music', async (req, res) => {
   const { videoUrl, musicUrl } = req.body
   if (!videoUrl || !musicUrl) return res.status(400).json({ error: 'videoUrl y musicUrl son obligatorios' })
-
-  if (!await ffmpegDisponible()) {
-    return res.status(503).json({ error: 'FFmpeg no disponible en el servidor' })
-  }
+  if (!await ffmpegDisponible()) return res.status(503).json({ error: 'FFmpeg no disponible' })
 
   try {
-    // Descargar video desde Magic Hour
     const videoRes = await fetch(videoUrl)
     if (!videoRes.ok) throw new Error('No se pudo descargar el video')
     const videoBuffer = Buffer.from(await videoRes.arrayBuffer())
-
-    // Mezclar con música al 15%
     const mixed = await mezclarMusica(videoBuffer, musicUrl)
-
-    res.set({
-      'Content-Type': 'video/mp4',
-      'Content-Disposition': `attachment; filename="video_con_musica.mp4"`,
-      'Content-Length': mixed.length,
-    })
+    res.set({ 'Content-Type': 'video/mp4', 'Content-Disposition': 'attachment; filename="video_con_musica.mp4"', 'Content-Length': mixed.length })
     res.send(mixed)
   } catch (err) {
     res.status(500).json({ error: err.message })
