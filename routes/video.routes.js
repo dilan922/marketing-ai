@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { crearVideo, esperarVideo, getKeysStatus } from '../services/magichour.js'
+import { crearVideo, esperarVideo, getKeysStatus, resetKeys } from '../services/magichour.js'
 import { generarAudio } from '../services/elevenlabs.js'
 import { transcribirConTimestamps, quemarSubtitulos, generarSRT, ffmpegDisponible } from '../services/subtitles.js'
 import { mezclarMusica } from '../services/audiomix.js'
@@ -8,9 +8,13 @@ import { mezclarMusica } from '../services/audiomix.js'
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
-// Estado de las API keys
 router.get('/keys-status', (req, res) => {
   res.json(getKeysStatus())
+})
+
+router.post('/reset-keys', (req, res) => {
+  resetKeys()
+  res.json({ ok: true, keys: getKeysStatus() })
 })
 
 // Generar video (text-to-video o image-to-video)

@@ -1,4 +1,5 @@
 const BASE = 'https://api.magichour.ai/v1'
+const RESET_MS = 24 * 60 * 60 * 1000 // 24 horas
 
 const KEYS = [
   process.env.MH_KEY_1,  process.env.MH_KEY_2,  process.env.MH_KEY_3,
@@ -10,15 +11,29 @@ const KEYS = [
   process.env.MH_KEY_19, process.env.MH_KEY_20,
 ].filter(Boolean)
 
-const keyState = new Map(KEYS.map(k => [k, { exhausted: false, lastUsed: 0 }]))
+const keyState = new Map(KEYS.map(k => [k, { exhausted: false, lastUsed: 0, exhaustedAt: 0 }]))
 
 function getAvailableKey() {
+  const now = Date.now()
+  // Auto-reset keys agotadas hace más de 24h (Magic Hour renueva créditos diariamente)
+  KEYS.forEach(k => {
+    const s = keyState.get(k)
+    if (s.exhausted && s.exhaustedAt && (now - s.exhaustedAt) > RESET_MS) {
+      s.exhausted = false
+      s.exhaustedAt = 0
+    }
+  })
+
   const available = KEYS.filter(k => !keyState.get(k)?.exhausted)
-  if (available.length === 0) {
-    KEYS.forEach(k => { if (keyState.has(k)) keyState.get(k).exhausted = false })
-    return KEYS[0]
-  }
+  if (available.length === 0) return null
   return available.sort((a, b) => keyState.get(a).lastUsed - keyState.get(b).lastUsed)[0]
+}
+
+export function resetKeys() {
+  KEYS.forEach(k => {
+    const s = keyState.get(k)
+    if (s) { s.exhausted = false; s.exhaustedAt = 0 }
+  })
 }
 
 function mhFetch(endpoint, method, body, key) {
@@ -34,10 +49,7 @@ async function uploadImageWithKey(imageBuffer, extension, key) {
     items: [{ type: 'image', extension }]
   }, key)
 
-  if (urlRes.status === 402) {
-    const err = { noCredits: true }
-    throw err
-  }
+  if (urlRes.status === 402) throw { noCredits: true }
   if (!urlRes.ok) {
     const body = await urlRes.json().catch(() => ({}))
     throw new Error(body.message || `Upload URL error ${urlRes.status}`)
@@ -61,6 +73,8 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
 
   while (intentos < KEYS.length) {
     const key = getAvailableKey()
+    if (!key) break
+
     keyState.get(key).lastUsed = Date.now()
 
     // Subir imagen con esta key
@@ -70,13 +84,12 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
         filePath = await uploadImageWithKey(imageBuffer, imageExt, key)
       } catch (uploadErr) {
         if (uploadErr.noCredits) {
-          // Solo marcar agotada si Magic Hour dice explícitamente que no hay créditos (402)
           keyState.get(key).exhausted = true
-          console.log(`[MH] Key #${intentos + 1} sin créditos para upload, rotando...`)
+          keyState.get(key).exhaustedAt = Date.now()
+          console.log(`[MH] Key #${KEYS.indexOf(key) + 1} sin créditos en upload, rotando...`)
           intentos++
           continue
         }
-        // Cualquier otro error de upload: lanzar directamente (no es problema de créditos)
         throw new Error(`Error subiendo imagen: ${uploadErr.message}`)
       }
     }
@@ -96,7 +109,8 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
 
     if (res.status === 402) {
       keyState.get(key).exhausted = true
-      console.log(`[MH] Key #${intentos + 1} sin créditos para video, rotando...`)
+      keyState.get(key).exhaustedAt = Date.now()
+      console.log(`[MH] Key #${KEYS.indexOf(key) + 1} sin créditos para video, rotando...`)
       intentos++
       continue
     }
@@ -111,11 +125,12 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
     return { id: data.id, key, creditsUsed: data.credits_charged }
   }
 
-  throw new Error('Todas las API keys de Magic Hour están agotadas por hoy. Se renovarán mañana.')
+  throw new Error('Todas las API keys de Magic Hour están agotadas. Usa el botón "Resetear Keys" mañana cuando los créditos se renueven.')
 }
 
 export async function estadoVideo(id) {
   const key = getAvailableKey()
+  if (!key) throw new Error('Sin keys disponibles para consultar estado')
   const res = await mhFetch(`/video-projects/${id}`, 'GET', null, key)
   if (!res.ok) throw new Error(`Error consultando estado: ${res.status}`)
   return res.json()
@@ -137,9 +152,17 @@ export async function esperarVideo(id, onProgress) {
 }
 
 export function getKeysStatus() {
-  return KEYS.map((k, i) => ({
-    numero: i + 1,
-    agotada: keyState.get(k)?.exhausted || false,
-    ultimoUso: keyState.get(k)?.lastUsed || 0,
-  }))
+  const now = Date.now()
+  return KEYS.map((k, i) => {
+    const s = keyState.get(k)
+    const horasRestantes = s.exhausted && s.exhaustedAt
+      ? Math.max(0, Math.ceil((RESET_MS - (now - s.exhaustedAt)) / 3600000))
+      : 0
+    return {
+      numero: i + 1,
+      agotada: s?.exhausted || false,
+      ultimoUso: s?.lastUsed || 0,
+      horasRestantes,
+    }
+  })
 }

@@ -889,12 +889,17 @@ input[type=range]::-webkit-slider-thumb {
     </div>
 
     <div class="card" style="margin-top:16px">
-      <div class="card-title"><div class="icon">🔑</div> Estado API Keys</div>
+      <div class="card-title" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px"><div class="icon">🔑</div> Estado API Keys</div>
+        <button id="btn-reset-keys" onclick="resetearKeys()" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);color:#FCA5A5;font-size:11px;font-weight:600;cursor:pointer;display:none;transition:all 0.2s">
+          🔄 Resetear Keys
+        </button>
+      </div>
       <div id="mini-keys" style="display:flex;flex-wrap:wrap;gap:6px">
-        <!-- dots de keys se generan por JS -->
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:10px">
         Las keys se rotan automáticamente. Si una se agota, pasa a la siguiente.
+        Los créditos de Magic Hour se renuevan cada 24h.
       </div>
     </div>
   </div>
@@ -1209,16 +1214,32 @@ async function actualizarMiniKeys() {
     const res = await fetch('/api/video/keys-status')
     const keys = await res.json()
     const activas = keys.filter(k => !k.agotada).length
-    document.getElementById('keys-info').textContent = `${activas}/20 keys activas`
+    document.getElementById('keys-info').textContent = `${activas}/${keys.length} keys activas`
 
     const mini = document.getElementById('mini-keys')
     mini.innerHTML = keys.map(k => `
-      <div title="Key #${k.numero} — ${k.agotada ? 'Sin créditos' : 'Disponible'}"
+      <div title="Key #${k.numero} — ${k.agotada ? `Sin créditos (~${k.horasRestantes}h)` : 'Disponible'}"
         style="width:28px;height:28px;border-radius:8px;background:${k.agotada ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'};
         border:1px solid ${k.agotada ? 'var(--red)' : 'var(--green)'};display:flex;align-items:center;justify-content:center;
         font-size:10px;font-weight:700;color:${k.agotada ? '#FCA5A5' : '#6EE7B7'};cursor:default">${k.numero}</div>
     `).join('')
+
+    // Mostrar botón reset solo si todas están agotadas
+    const btnReset = document.getElementById('btn-reset-keys')
+    if (btnReset) btnReset.style.display = activas === 0 ? 'block' : 'none'
   } catch {}
+}
+
+async function resetearKeys() {
+  const btn = document.getElementById('btn-reset-keys')
+  if (btn) btn.textContent = '⏳ Reseteando...'
+  try {
+    await fetch('/api/video/reset-keys', { method: 'POST' })
+    toast('Keys reseteadas — listas para usar', 'success')
+    await actualizarMiniKeys()
+  } catch {
+    toast('Error al resetear keys', 'error')
+  }
 }
 
 async function abrirModalKeys() {
