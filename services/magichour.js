@@ -151,6 +151,21 @@ export async function esperarVideo(id, onProgress) {
   }
 }
 
+// Prueba cada key con GET /video-projects (no crea nada, no gasta créditos)
+export async function testKeys() {
+  const results = []
+  for (let i = 0; i < KEYS.length; i++) {
+    const key = KEYS[i]
+    try {
+      const res = await mhFetch('/video-projects?page=1&page_size=1', 'GET', null, key)
+      results.push({ numero: i + 1, status: res.status, ok: res.ok })
+    } catch (e) {
+      results.push({ numero: i + 1, status: 'error', ok: false, error: e.message })
+    }
+  }
+  return results
+}
+
 export function getKeysStatus() {
   const now = Date.now()
   return KEYS.map((k, i) => {

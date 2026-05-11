@@ -17,6 +17,13 @@ router.post('/reset-keys', (req, res) => {
   res.json({ ok: true, keys: getKeysStatus() })
 })
 
+// Diagnóstico: prueba cada key con una llamada liviana (no gasta créditos)
+router.get('/test-keys', async (req, res) => {
+  const { testKeys } = await import('../services/magichour.js')
+  const results = await testKeys()
+  res.json(results)
+})
+
 // Generar video (text-to-video o image-to-video)
 router.post('/generate', upload.single('imagen'), async (req, res) => {
   const { prompt, duracion = 10, modelo = 'kling-3.0', aspectRatio = '9:16', guion } = req.body
