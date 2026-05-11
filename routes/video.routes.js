@@ -3,6 +3,7 @@ import multer from 'multer'
 import { crearVideo, uploadImage, esperarVideo, getKeysStatus } from '../services/magichour.js'
 import { generarAudio } from '../services/elevenlabs.js'
 import { transcribirConTimestamps, quemarSubtitulos, generarSRT, ffmpegDisponible } from '../services/subtitles.js'
+import { mezclarMusica } from '../services/audiomix.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
@@ -94,6 +95,36 @@ router.post('/subtitulos', upload.single('audio'), async (req, res) => {
     const srt = generarSRT(words)
     res.set({ 'Content-Type': 'text/plain', 'Content-Disposition': 'attachment; filename="subtitulos.srt"' })
     res.send(srt)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Mezclar video con música de fondo (ducking 15%)
+// Body: { videoUrl, musicUrl }
+router.post('/mix-music', async (req, res) => {
+  const { videoUrl, musicUrl } = req.body
+  if (!videoUrl || !musicUrl) return res.status(400).json({ error: 'videoUrl y musicUrl son obligatorios' })
+
+  if (!await ffmpegDisponible()) {
+    return res.status(503).json({ error: 'FFmpeg no disponible en el servidor' })
+  }
+
+  try {
+    // Descargar video desde Magic Hour
+    const videoRes = await fetch(videoUrl)
+    if (!videoRes.ok) throw new Error('No se pudo descargar el video')
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer())
+
+    // Mezclar con música al 15%
+    const mixed = await mezclarMusica(videoBuffer, musicUrl)
+
+    res.set({
+      'Content-Type': 'video/mp4',
+      'Content-Disposition': `attachment; filename="video_con_musica.mp4"`,
+      'Content-Length': mixed.length,
+    })
+    res.send(mixed)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

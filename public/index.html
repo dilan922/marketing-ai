@@ -467,6 +467,255 @@ input[type=range]::-webkit-slider-thumb {
 .modal-close { width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;margin-top:16px;font-size:14px; }
 .modal-close:hover { color:var(--text); }
 
+/* ── Música Drawer ──────────────────────────────────────────── */
+.music-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 380px;
+  background: #0A0A16;
+  border-left: 1px solid var(--border);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(24px);
+}
+.music-drawer.open { transform: translateX(0); }
+.music-drawer-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 149;
+  display: none;
+  backdrop-filter: blur(4px);
+}
+.music-drawer-backdrop.open { display: block; }
+
+.drawer-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.drawer-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.drawer-close {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.drawer-close:hover { color: var(--text); border-color: var(--g1); }
+
+.drawer-search {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.search-input-wrap { position: relative; }
+.search-input-wrap input {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 10px 14px 10px 36px;
+}
+.search-input-wrap input:focus { border-color: var(--g1); outline: none; }
+.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; pointer-events: none; }
+
+.genre-pills {
+  padding: 12px 20px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.genre-pills::-webkit-scrollbar { display: none; }
+.genre-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.genre-pill.active {
+  color: white;
+  border-color: transparent;
+}
+
+.drawer-tracks {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.tracks-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 12px 8px 8px;
+}
+
+.track-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+}
+.track-card:hover { background: rgba(255,255,255,0.05); }
+.track-card.selected { background: rgba(124,58,237,0.12); border-color: rgba(124,58,237,0.4); }
+
+.track-cover {
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--g1), var(--g2));
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.track-cover img { width: 100%; height: 100%; object-fit: cover; }
+
+.track-info { flex: 1; min-width: 0; }
+.track-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-artist {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-duration {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.track-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-play {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.btn-play:hover { border-color: var(--g2); color: var(--g2); }
+.btn-play.playing { background: var(--g2); border-color: var(--g2); color: white; }
+.btn-select-track {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--g1);
+  background: rgba(124,58,237,0.1);
+  color: #A78BFA;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn-select-track:hover { background: rgba(124,58,237,0.25); }
+.btn-select-track.selected-btn {
+  background: var(--g1);
+  color: white;
+}
+
+/* Track seleccionado (chip debajo del botón generar) */
+.music-chip {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: rgba(124,58,237,0.1);
+  border: 1px solid rgba(124,58,237,0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.music-chip.show { display: flex; }
+.music-chip-cover {
+  width: 32px; height: 32px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--g1), var(--g2));
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.music-chip-cover img { width: 100%; height: 100%; object-fit: cover; }
+.music-chip-info { flex: 1; min-width: 0; }
+.music-chip-title { font-size: 12px; font-weight: 600; color: #A78BFA; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.music-chip-artist { font-size: 11px; color: var(--muted); }
+.music-chip-remove {
+  background: none; border: none;
+  color: var(--muted); cursor: pointer;
+  font-size: 16px; padding: 2px;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+.music-chip-remove:hover { color: var(--red); }
+
+/* Botón flotante música */
+.btn-music {
+  width: 100%;
+  padding: 11px;
+  border-radius: 12px;
+  border: 1px solid rgba(124,58,237,0.4);
+  background: rgba(124,58,237,0.08);
+  color: #A78BFA;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-music:hover { background: rgba(124,58,237,0.18); border-color: var(--g1); }
+
+.drawer-loading { text-align: center; padding: 30px; color: var(--muted); font-size: 13px; }
+.drawer-loading .spinner { margin: 0 auto 10px; width: 20px; height: 20px; }
+
 /* Toast */
 .toast {
   position: fixed;
@@ -592,6 +841,19 @@ input[type=range]::-webkit-slider-thumb {
         </label>
       </div>
 
+      <!-- Chip música seleccionada -->
+      <div class="music-chip" id="music-chip">
+        <div class="music-chip-cover"><img id="chip-cover" src="" onerror="this.style.display='none'"></div>
+        <div class="music-chip-info">
+          <div class="music-chip-title" id="chip-title">—</div>
+          <div class="music-chip-artist" id="chip-artist">—</div>
+        </div>
+        <button class="music-chip-remove" onclick="removerMusica()" title="Quitar música">✕</button>
+      </div>
+
+      <!-- Botón abrir drawer -->
+      <button class="btn-music" onclick="abrirDrawerMusica()">🎵 Agregar Música de Fondo</button>
+
       <button class="btn-generate" id="btn-gen-video" onclick="generarVideo()">
         <span>🎬 GENERAR VIDEO</span>
       </button>
@@ -690,6 +952,36 @@ input[type=range]::-webkit-slider-thumb {
 </div>
 
 </main>
+
+<!-- ── Drawer Música ─────────────────────────────────────────── -->
+<div class="music-drawer-backdrop" id="drawer-backdrop" onclick="cerrarDrawerMusica()"></div>
+<div class="music-drawer" id="music-drawer">
+
+  <div class="drawer-header">
+    <div class="drawer-title">🎵 Soundtrack</div>
+    <button class="drawer-close" onclick="cerrarDrawerMusica()">✕</button>
+  </div>
+
+  <div class="drawer-search">
+    <div class="search-input-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="music-search" placeholder="Buscar canción o artista..."
+        oninput="onMusicSearch(this.value)">
+    </div>
+  </div>
+
+  <div class="genre-pills" id="genre-pills">
+    <!-- se llena por JS -->
+  </div>
+
+  <div class="drawer-tracks" id="drawer-tracks">
+    <div class="drawer-loading">
+      <div class="spinner"></div>
+      Cargando tendencias...
+    </div>
+  </div>
+
+</div>
 
 <!-- Modal Keys -->
 <div class="modal-overlay" id="modal-keys">
@@ -814,12 +1106,19 @@ function pollVideoStatus(jobId) {
       if (data.status === 'complete' && data.downloadUrl) {
         clearInterval(pollingInterval)
         document.getElementById('v-progress-fill').style.width = '100%'
-        mostrarVideoPreview(data.downloadUrl)
+
+        // Mezclar música si hay una seleccionada
+        let finalUrl = data.downloadUrl
+        if (window._postVideoGenerated) {
+          finalUrl = await window._postVideoGenerated(data.downloadUrl)
+        }
+
+        mostrarVideoPreview(finalUrl)
         setVideoStatus('success', '✅ Video generado correctamente')
         document.getElementById('btn-gen-video').disabled = false
         document.getElementById('btn-gen-video').querySelector('span').textContent = '🎬 GENERAR VIDEO'
         document.getElementById('btn-dl-video').classList.add('show')
-        currentVideoUrl = data.downloadUrl
+        currentVideoUrl = finalUrl
         toast('¡Video listo!', 'success')
         actualizarMiniKeys()
       } else if (data.status === 'error') {
@@ -954,6 +1253,200 @@ function toast(msg, type = 'success') {
 // ── Init ─────────────────────────────────────────────────────
 actualizarMiniKeys()
 setInterval(actualizarMiniKeys, 30000)
+
+// ── Música Drawer ─────────────────────────────────────────────
+let selectedTrack  = null   // { id, title, artist, previewUrl, coverUrl }
+let currentAudio   = null   // HTMLAudioElement activo
+let currentGenre   = 'tiktok'
+let searchTimeout  = null
+let genres         = []
+
+async function abrirDrawerMusica() {
+  document.getElementById('music-drawer').classList.add('open')
+  document.getElementById('drawer-backdrop').classList.add('open')
+  if (genres.length === 0) await cargarGeneros()
+  cargarTendencias(currentGenre)
+}
+
+function cerrarDrawerMusica() {
+  document.getElementById('music-drawer').classList.remove('open')
+  document.getElementById('drawer-backdrop').classList.remove('open')
+}
+
+async function cargarGeneros() {
+  try {
+    const res = await fetch('/api/audio/genres')
+    genres = await res.json()
+    const pills = document.getElementById('genre-pills')
+    pills.innerHTML = genres.map(g => `
+      <button class="genre-pill ${g.key === currentGenre ? 'active' : ''}"
+        style="${g.key === currentGenre ? `background:${g.color};border-color:${g.color}` : ''}"
+        onclick="seleccionarGenero('${g.key}','${g.color}',this)">
+        ${g.name}
+      </button>
+    `).join('')
+  } catch {}
+}
+
+function seleccionarGenero(key, color, btn) {
+  currentGenre = key
+  document.querySelectorAll('.genre-pill').forEach(p => {
+    p.classList.remove('active')
+    p.style.background = ''
+    p.style.borderColor = ''
+  })
+  btn.classList.add('active')
+  btn.style.background = color
+  btn.style.borderColor = color
+  cargarTendencias(key)
+}
+
+async function cargarTendencias(genre) {
+  const container = document.getElementById('drawer-tracks')
+  container.innerHTML = `<div class="drawer-loading"><div class="spinner" style="display:block;margin:0 auto 10px"></div>Cargando tendencias...</div>`
+  try {
+    const res = await fetch(`/api/audio/trending?genre=${genre}`)
+    const tracks = await res.json()
+    renderTracks(tracks, '🔥 Tendencias')
+  } catch {
+    container.innerHTML = `<div class="drawer-loading">Error cargando música</div>`
+  }
+}
+
+function onMusicSearch(q) {
+  clearTimeout(searchTimeout)
+  if (!q.trim()) { cargarTendencias(currentGenre); return }
+  searchTimeout = setTimeout(async () => {
+    const container = document.getElementById('drawer-tracks')
+    container.innerHTML = `<div class="drawer-loading"><div class="spinner" style="display:block;margin:0 auto 10px"></div>Buscando...</div>`
+    try {
+      const res = await fetch(`/api/audio/search?q=${encodeURIComponent(q)}`)
+      const tracks = await res.json()
+      renderTracks(tracks, `Resultados para "${q}"`)
+    } catch {
+      container.innerHTML = `<div class="drawer-loading">Error en la búsqueda</div>`
+    }
+  }, 400)
+}
+
+function formatDuration(s) {
+  const m = Math.floor(s / 60)
+  const sec = String(s % 60).padStart(2, '0')
+  return `${m}:${sec}`
+}
+
+function renderTracks(tracks, label) {
+  const container = document.getElementById('drawer-tracks')
+  if (!tracks.length) {
+    container.innerHTML = `<div class="drawer-loading">Sin resultados</div>`
+    return
+  }
+  container.innerHTML = `<div class="tracks-label">${label}</div>` + tracks.map(t => {
+    const isSelected = selectedTrack?.id === t.id
+    return `
+    <div class="track-card ${isSelected ? 'selected' : ''}" id="tc-${t.id}">
+      <div class="track-cover">
+        ${t.coverUrl ? `<img src="${t.coverUrl}" onerror="this.parentElement.textContent='🎵'">` : '🎵'}
+      </div>
+      <div class="track-info">
+        <div class="track-title">${t.title}</div>
+        <div class="track-artist">${t.artist}</div>
+      </div>
+      <div class="track-duration">${formatDuration(t.duration || 0)}</div>
+      <div class="track-actions">
+        <button class="btn-play" id="bp-${t.id}" onclick="togglePreview('${t.id}','${encodeURIComponent(t.previewUrl)}',this)" title="Preescuchar">▶</button>
+        <button class="btn-select-track ${isSelected ? 'selected-btn' : ''}"
+          onclick="seleccionarTrack(${JSON.stringify(t).replace(/"/g,'&quot;')})">
+          ${isSelected ? '✓ Elegida' : 'Elegir'}
+        </button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function togglePreview(id, encodedUrl, btn) {
+  const url = decodeURIComponent(encodedUrl)
+
+  // Detener audio previo
+  if (currentAudio) {
+    currentAudio.pause()
+    document.querySelectorAll('.btn-play').forEach(b => { b.textContent = '▶'; b.classList.remove('playing') })
+  }
+
+  if (btn.classList.contains('playing')) {
+    currentAudio = null
+    return
+  }
+
+  currentAudio = new Audio(url)
+  currentAudio.volume = 0.7
+  currentAudio.play().catch(() => {})
+  btn.textContent = '⏸'
+  btn.classList.add('playing')
+  currentAudio.onended = () => { btn.textContent = '▶'; btn.classList.remove('playing') }
+}
+
+function seleccionarTrack(track) {
+  // Detener preview si suena
+  if (currentAudio) { currentAudio.pause(); currentAudio = null }
+  document.querySelectorAll('.btn-play').forEach(b => { b.textContent = '▶'; b.classList.remove('playing') })
+
+  selectedTrack = track
+
+  // Actualizar chip
+  document.getElementById('chip-title').textContent = track.title
+  document.getElementById('chip-artist').textContent = track.artist
+  const chipCover = document.getElementById('chip-cover')
+  chipCover.src = track.coverUrl || ''
+  chipCover.style.display = track.coverUrl ? 'block' : 'none'
+  document.getElementById('music-chip').classList.add('show')
+
+  // Actualizar botón del drawer
+  document.querySelectorAll('.btn-select-track').forEach(b => { b.textContent = 'Elegir'; b.classList.remove('selected-btn') })
+  document.querySelectorAll('.track-card').forEach(c => c.classList.remove('selected'))
+  const card = document.getElementById(`tc-${track.id}`)
+  if (card) {
+    card.classList.add('selected')
+    card.querySelector('.btn-select-track').textContent = '✓ Elegida'
+    card.querySelector('.btn-select-track').classList.add('selected-btn')
+  }
+
+  toast(`🎵 "${track.title}" seleccionada`, 'success')
+  setTimeout(cerrarDrawerMusica, 800)
+}
+
+function removerMusica() {
+  selectedTrack = null
+  document.getElementById('music-chip').classList.remove('show')
+  if (currentAudio) { currentAudio.pause(); currentAudio = null }
+}
+
+// Extender generarVideo para mezclar música si hay una seleccionada
+const _generarVideoOrig = generarVideo
+window._postVideoGenerated = async function(videoUrl) {
+  if (!selectedTrack) return videoUrl
+
+  toast('🎵 Mezclando música de fondo...', 'success')
+  setVideoStatus('loading', 'Mezclando música al 15% de volumen...')
+
+  try {
+    const res = await fetch('/api/video/mix-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoUrl, musicUrl: selectedTrack.previewUrl }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Error mezclando')
+    }
+    // Retornar blob URL del video mezclado
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  } catch (e) {
+    toast(`⚠️ Música no agregada: ${e.message}`, 'error')
+    return videoUrl
+  }
+}
 </script>
 </body>
 </html>
