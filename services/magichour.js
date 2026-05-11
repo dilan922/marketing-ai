@@ -67,12 +67,13 @@ export async function crearVideo({ prompt, filePath, duracion = 10, modelo = 'kl
     keyState.get(key).lastUsed = Date.now()
 
     const endpoint = filePath ? '/image-to-video' : '/text-to-video'
+    const resolution = modelo === 'ltx-2' ? '480p' : '720p'
     const body = {
       end_seconds: duracion,
       style: { prompt },
       model: modelo,
       aspect_ratio: aspectRatio,
-      resolution: '720p',
+      resolution,
       ...(filePath && { assets: { image_file_path: filePath } }),
     }
 
