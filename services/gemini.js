@@ -1,4 +1,3 @@
-// Generación de imágenes con Gemini (Imagen 3)
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 export async function generarImagen(prompt) {
@@ -8,13 +7,13 @@ export async function generarImagen(prompt) {
   }
 
   const res = await fetch(
-    `${BASE}/models/imagen-3.0-generate-001:predict?key=${key}`,
+    `${BASE}/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${key}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: '9:16' },
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
       }),
     }
   )
@@ -25,7 +24,8 @@ export async function generarImagen(prompt) {
   }
 
   const data = await res.json()
-  const b64 = data.predictions?.[0]?.bytesBase64Encoded
+  const parts = data.candidates?.[0]?.content?.parts
+  const b64 = parts?.find(p => p.inlineData)?.inlineData?.data
   if (!b64) throw new Error('No se recibió imagen de Gemini')
-  return b64 // base64 PNG
+  return b64
 }

@@ -37,17 +37,24 @@ export async function uploadImage(imageBuffer, extension = 'jpg') {
   const key = getAvailableKey()
   keyState.get(key).lastUsed = Date.now()
 
-  const urlRes = await mhFetch('/files/upload-urls', 'POST', {
+  const urlRes = await mhFetch('/files/generate-asset-upload-urls', 'POST', {
     items: [{ type: 'image', extension }]
   }, key)
+  if (!urlRes.ok) {
+    const err = await urlRes.json().catch(() => ({}))
+    throw new Error(err.message || `Error obteniendo upload URL: ${urlRes.status}`)
+  }
   const { items } = await urlRes.json()
   const { upload_url, file_path } = items[0]
 
-  await fetch(upload_url, {
+  const putRes = await fetch(upload_url, {
     method: 'PUT',
     headers: { 'Content-Type': `image/${extension}` },
     body: imageBuffer,
   })
+  if (!putRes.ok) {
+    throw new Error(`Error subiendo imagen a S3: ${putRes.status}`)
+  }
 
   return file_path
 }
