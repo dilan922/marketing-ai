@@ -33,10 +33,16 @@ async function uploadImageWithKey(imageBuffer, extension, key) {
   const urlRes = await mhFetch('/files/upload-urls', 'POST', {
     items: [{ type: 'image', extension }]
   }, key)
-  if (!urlRes.ok) {
-    const err = await urlRes.json().catch(() => ({}))
-    throw new Error(err.message || `Error obteniendo upload URL: ${urlRes.status}`)
+
+  if (urlRes.status === 402) {
+    const err = { noCredits: true }
+    throw err
   }
+  if (!urlRes.ok) {
+    const body = await urlRes.json().catch(() => ({}))
+    throw new Error(body.message || `Upload URL error ${urlRes.status}`)
+  }
+
   const { items } = await urlRes.json()
   const { upload_url, file_path } = items[0]
 
@@ -50,7 +56,6 @@ async function uploadImageWithKey(imageBuffer, extension, key) {
   return file_path
 }
 
-// Crear video. Si se pasa imageBuffer, el retry sube la imagen de nuevo con la nueva key.
 export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg', duracion = 10, modelo = 'kling-3.0', aspectRatio = '9:16' }) {
   let intentos = 0
 
@@ -58,16 +63,21 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
     const key = getAvailableKey()
     keyState.get(key).lastUsed = Date.now()
 
-    // Subir imagen con esta key si corresponde
+    // Subir imagen con esta key
     let filePath = null
     if (imageBuffer) {
       try {
         filePath = await uploadImageWithKey(imageBuffer, imageExt, key)
       } catch (uploadErr) {
-        console.log(`[MH] Error subiendo imagen con key ${intentos + 1}: ${uploadErr.message}`)
-        keyState.get(key).exhausted = true
-        intentos++
-        continue
+        if (uploadErr.noCredits) {
+          // Solo marcar agotada si Magic Hour dice explícitamente que no hay créditos (402)
+          keyState.get(key).exhausted = true
+          console.log(`[MH] Key #${intentos + 1} sin créditos para upload, rotando...`)
+          intentos++
+          continue
+        }
+        // Cualquier otro error de upload: lanzar directamente (no es problema de créditos)
+        throw new Error(`Error subiendo imagen: ${uploadErr.message}`)
       }
     }
 
@@ -86,7 +96,7 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
 
     if (res.status === 402) {
       keyState.get(key).exhausted = true
-      console.log(`[MH] Key ${intentos + 1} agotada, rotando...`)
+      console.log(`[MH] Key #${intentos + 1} sin créditos para video, rotando...`)
       intentos++
       continue
     }
@@ -97,12 +107,13 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
     }
 
     const data = await res.json()
+    console.log(`[MH] Video creado con key #${KEYS.indexOf(key) + 1}, id: ${data.id}`)
     return { id: data.id, key, creditsUsed: data.credits_charged }
   }
+
   throw new Error('Todas las API keys de Magic Hour están agotadas por hoy. Se renovarán mañana.')
 }
 
-// Consultar estado del video
 export async function estadoVideo(id) {
   const key = getAvailableKey()
   const res = await mhFetch(`/video-projects/${id}`, 'GET', null, key)
