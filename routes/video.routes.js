@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { crearVideo, esperarVideo, getKeysStatus, resetKeys } from '../services/magichour.js'
+import { crearVideo, esperarVideo, getKeysStatus, resetKeys, testKeys } from '../services/magichour.js'
 import { generarAudio } from '../services/elevenlabs.js'
 import { transcribirConTimestamps, quemarSubtitulos, generarSRT, ffmpegDisponible } from '../services/subtitles.js'
 import { mezclarMusica } from '../services/audiomix.js'
@@ -17,11 +17,14 @@ router.post('/reset-keys', (req, res) => {
   res.json({ ok: true, keys: getKeysStatus() })
 })
 
-// Diagnóstico: prueba cada key con una llamada liviana (no gasta créditos)
+// Diagnóstico: prueba cada key sin gastar créditos
 router.get('/test-keys', async (req, res) => {
-  const { testKeys } = await import('../services/magichour.js')
-  const results = await testKeys()
-  res.json(results)
+  try {
+    const results = await testKeys()
+    res.json(results)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // Generar video (text-to-video o image-to-video)

@@ -77,20 +77,20 @@ export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg',
 
     keyState.get(key).lastUsed = Date.now()
 
-    // Subir imagen con esta key
+    // Subir imagen con esta key (si falla por créditos, continuar con text-to-video)
     let filePath = null
+    let usingTextFallback = false
     if (imageBuffer) {
       try {
         filePath = await uploadImageWithKey(imageBuffer, imageExt, key)
       } catch (uploadErr) {
         if (uploadErr.noCredits) {
-          keyState.get(key).exhausted = true
-          keyState.get(key).exhaustedAt = Date.now()
-          console.log(`[MH] Key #${KEYS.indexOf(key) + 1} sin créditos en upload, rotando...`)
-          intentos++
-          continue
+          console.log(`[MH] Key #${KEYS.indexOf(key) + 1}: upload imagen sin créditos, usando text-to-video`)
+          usingTextFallback = true
+          // No marcar como agotada aún — intentar text-to-video con esta misma key
+        } else {
+          throw new Error(`Error subiendo imagen: ${uploadErr.message}`)
         }
-        throw new Error(`Error subiendo imagen: ${uploadErr.message}`)
       }
     }
 
