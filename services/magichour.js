@@ -66,7 +66,7 @@ export async function crearVideo({ prompt, filePath, duracion = 10, modelo = 'kl
     const key = getAvailableKey()
     keyState.get(key).lastUsed = Date.now()
 
-    const endpoint = filePath ? '/image-to-video' : '/text-to-video'
+    const endpoint = filePath ? '/video-projects/image-to-video' : '/video-projects/text-to-video'
     const resolution = modelo === 'ltx-2' ? '480p' : '720p'
     const body = {
       end_seconds: duracion,
