@@ -1,0 +1,61 @@
+services:
+  - type: web
+    name: marketing-ai
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.11.0
+      - key: MH_KEY_1
+        sync: false
+      - key: MH_KEY_2
+        sync: false
+      - key: MH_KEY_3
+        sync: false
+      - key: MH_KEY_4
+        sync: false
+      - key: MH_KEY_5
+        sync: false
+      - key: MH_KEY_6
+        sync: false
+      - key: MH_KEY_7
+        sync: false
+      - key: MH_KEY_8
+        sync: false
+      - key: MH_KEY_9
+        sync: false
+      - key: MH_KEY_10
+        sync: false
+      - key: MH_KEY_11
+        sync: false
+      - key: MH_KEY_12
+        sync: false
+      - key: MH_KEY_13
+        sync: false
+      - key: MH_KEY_14
+        sync: false
+      - key: MH_KEY_15
+        sync: false
+      - key: MH_KEY_16
+        sync: false
+      - key: MH_KEY_17
+        sync: false
+      - key: MH_KEY_18
+        sync: false
+      - key: MH_KEY_19
+        sync: false
+      - key: MH_KEY_20
+        sync: false
+      - key: ELEVENLABS_API_KEY_1
+        sync: false
+      - key: ELEVENLABS_API_KEY_2
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
