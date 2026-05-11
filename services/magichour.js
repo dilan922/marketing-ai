@@ -10,17 +10,14 @@ const KEYS = [
   process.env.MH_KEY_19, process.env.MH_KEY_20,
 ].filter(Boolean)
 
-// Estado de cada key: cuándo fue usada y si está agotada
 const keyState = new Map(KEYS.map(k => [k, { exhausted: false, lastUsed: 0 }]))
 
-function getAvailableKey() {
-  const available = KEYS.filter(k => !keyState.get(k)?.exhausted)
+function getAvailableKey(exclude = null) {
+  const available = KEYS.filter(k => !keyState.get(k)?.exhausted && k !== exclude)
   if (available.length === 0) {
-    // Todas agotadas — reset diario y empezar de nuevo
     KEYS.forEach(k => { if (keyState.has(k)) keyState.get(k).exhausted = false })
     return KEYS[0]
   }
-  // Usa la que lleva más tiempo sin usarse (round-robin justo)
   return available.sort((a, b) => keyState.get(a).lastUsed - keyState.get(b).lastUsed)[0]
 }
 
@@ -32,12 +29,12 @@ function mhFetch(endpoint, method, body, key) {
   })
 }
 
-// Subir imagen de producto a Magic Hour y obtener file_path
+// Sube imagen y devuelve { filePath, key } — la misma key debe usarse para crear el video
 export async function uploadImage(imageBuffer, extension = 'jpg') {
   const key = getAvailableKey()
   keyState.get(key).lastUsed = Date.now()
 
-  const urlRes = await mhFetch('/files/generate-asset-upload-urls', 'POST', {
+  const urlRes = await mhFetch('/files/upload-urls', 'POST', {
     items: [{ type: 'image', extension }]
   }, key)
   if (!urlRes.ok) {
@@ -56,17 +53,20 @@ export async function uploadImage(imageBuffer, extension = 'jpg') {
     throw new Error(`Error subiendo imagen a S3: ${putRes.status}`)
   }
 
-  return file_path
+  return { filePath: file_path, key }
 }
 
-// Crear job de video con rotación automática de keys
-export async function crearVideo({ prompt, filePath, duracion = 10, modelo = 'kling-3.0', aspectRatio = '9:16' }) {
+// Crear job de video. Si se sube imagen primero, pasar uploadKey para usar la misma cuenta.
+export async function crearVideo({ prompt, filePath, duracion = 10, modelo = 'kling-3.0', aspectRatio = '9:16', uploadKey = null }) {
   let intentos = 0
-  while (intentos < KEYS.length) {
-    const key = getAvailableKey()
-    keyState.get(key).lastUsed = Date.now()
+  const maxIntentos = uploadKey ? 1 : KEYS.length
 
-    const endpoint = filePath ? '/video-projects/image-to-video' : '/video-projects/text-to-video'
+  while (intentos < maxIntentos) {
+    // Si hay imagen subida, DEBE usarse la misma key (misma cuenta)
+    const key = uploadKey || getAvailableKey()
+    if (!uploadKey) keyState.get(key).lastUsed = Date.now()
+
+    const endpoint = filePath ? '/image-to-video' : '/text-to-video'
     const resolution = modelo === 'ltx-2' ? '480p' : '720p'
     const body = {
       end_seconds: duracion,
@@ -80,7 +80,10 @@ export async function crearVideo({ prompt, filePath, duracion = 10, modelo = 'kl
     const res = await mhFetch(endpoint, 'POST', body, key)
 
     if (res.status === 402) {
-      // Sin créditos — marcar key como agotada y reintentar
+      if (uploadKey) {
+        keyState.get(key).exhausted = true
+        throw new Error('La key usada para subir la imagen no tiene créditos.')
+      }
       keyState.get(key).exhausted = true
       console.log(`[MH] Key agotada, rotando a siguiente...`)
       intentos++

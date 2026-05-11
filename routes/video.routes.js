@@ -22,18 +22,22 @@ router.post('/generate', upload.single('imagen'), async (req, res) => {
   try {
     // 1. Subir imagen si viene
     let filePath = null
+    let uploadKey = null
     if (req.file) {
       const ext = req.file.mimetype.split('/')[1] || 'jpg'
-      filePath = await uploadImage(req.file.buffer, ext)
+      const uploaded = await uploadImage(req.file.buffer, ext)
+      filePath = uploaded.filePath
+      uploadKey = uploaded.key
     }
 
-    // 2. Crear job de video en Magic Hour
+    // 2. Crear video con la misma key usada para subir la imagen
     const { id } = await crearVideo({
       prompt,
       filePath,
       duracion: Math.min(Math.max(parseInt(duracion), 1), 60),
       modelo,
       aspectRatio,
+      uploadKey,
     })
 
     res.json({ ok: true, jobId: id, mensaje: 'Video en cola, consultando estado...' })
