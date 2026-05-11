@@ -7,13 +7,13 @@ export async function generarImagen(prompt) {
   }
 
   const res = await fetch(
-    `${BASE}/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${key}`,
+    `${BASE}/models/imagen-4.0-generate-001:predict?key=${key}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+        instances: [{ prompt }],
+        parameters: { sampleCount: 1 },
       }),
     }
   )
@@ -24,8 +24,9 @@ export async function generarImagen(prompt) {
   }
 
   const data = await res.json()
-  const parts = data.candidates?.[0]?.content?.parts
-  const b64 = parts?.find(p => p.inlineData)?.inlineData?.data
+  // Imagen 4 usa image.imageBytes, Imagen 3 usaba bytesBase64Encoded
+  const pred = data.predictions?.[0]
+  const b64 = pred?.bytesBase64Encoded || pred?.image?.imageBytes
   if (!b64) throw new Error('No se recibió imagen de Gemini')
   return b64
 }
