@@ -12,8 +12,8 @@ const KEYS = [
 
 const keyState = new Map(KEYS.map(k => [k, { exhausted: false, lastUsed: 0 }]))
 
-function getAvailableKey(exclude = null) {
-  const available = KEYS.filter(k => !keyState.get(k)?.exhausted && k !== exclude)
+function getAvailableKey() {
+  const available = KEYS.filter(k => !keyState.get(k)?.exhausted)
   if (available.length === 0) {
     KEYS.forEach(k => { if (keyState.has(k)) keyState.get(k).exhausted = false })
     return KEYS[0]
@@ -29,11 +29,7 @@ function mhFetch(endpoint, method, body, key) {
   })
 }
 
-// Sube imagen y devuelve { filePath, key } — la misma key debe usarse para crear el video
-export async function uploadImage(imageBuffer, extension = 'jpg') {
-  const key = getAvailableKey()
-  keyState.get(key).lastUsed = Date.now()
-
+async function uploadImageWithKey(imageBuffer, extension, key) {
   const urlRes = await mhFetch('/files/upload-urls', 'POST', {
     items: [{ type: 'image', extension }]
   }, key)
@@ -49,22 +45,31 @@ export async function uploadImage(imageBuffer, extension = 'jpg') {
     headers: { 'Content-Type': `image/${extension}` },
     body: imageBuffer,
   })
-  if (!putRes.ok) {
-    throw new Error(`Error subiendo imagen a S3: ${putRes.status}`)
-  }
+  if (!putRes.ok) throw new Error(`Error subiendo imagen a S3: ${putRes.status}`)
 
-  return { filePath: file_path, key }
+  return file_path
 }
 
-// Crear job de video. Si se sube imagen primero, pasar uploadKey para usar la misma cuenta.
-export async function crearVideo({ prompt, filePath, duracion = 10, modelo = 'kling-3.0', aspectRatio = '9:16', uploadKey = null }) {
+// Crear video. Si se pasa imageBuffer, el retry sube la imagen de nuevo con la nueva key.
+export async function crearVideo({ prompt, imageBuffer = null, imageExt = 'jpg', duracion = 10, modelo = 'kling-3.0', aspectRatio = '9:16' }) {
   let intentos = 0
-  const maxIntentos = uploadKey ? 1 : KEYS.length
 
-  while (intentos < maxIntentos) {
-    // Si hay imagen subida, DEBE usarse la misma key (misma cuenta)
-    const key = uploadKey || getAvailableKey()
-    if (!uploadKey) keyState.get(key).lastUsed = Date.now()
+  while (intentos < KEYS.length) {
+    const key = getAvailableKey()
+    keyState.get(key).lastUsed = Date.now()
+
+    // Subir imagen con esta key si corresponde
+    let filePath = null
+    if (imageBuffer) {
+      try {
+        filePath = await uploadImageWithKey(imageBuffer, imageExt, key)
+      } catch (uploadErr) {
+        console.log(`[MH] Error subiendo imagen con key ${intentos + 1}: ${uploadErr.message}`)
+        keyState.get(key).exhausted = true
+        intentos++
+        continue
+      }
+    }
 
     const endpoint = filePath ? '/image-to-video' : '/text-to-video'
     const resolution = modelo === 'ltx-2' ? '480p' : '720p'
@@ -80,12 +85,8 @@ export async function crearVideo({ prompt, filePath, duracion = 10, modelo = 'kl
     const res = await mhFetch(endpoint, 'POST', body, key)
 
     if (res.status === 402) {
-      if (uploadKey) {
-        keyState.get(key).exhausted = true
-        throw new Error('La key usada para subir la imagen no tiene créditos.')
-      }
       keyState.get(key).exhausted = true
-      console.log(`[MH] Key agotada, rotando a siguiente...`)
+      console.log(`[MH] Key ${intentos + 1} agotada, rotando...`)
       intentos++
       continue
     }
@@ -109,25 +110,15 @@ export async function estadoVideo(id) {
   return res.json()
 }
 
-// Esperar hasta que el video esté listo (polling)
 export async function esperarVideo(id, onProgress) {
   const DELAYS = [3000, 5000, 8000, 10000, 15000, 20000]
   let attempt = 0
-
   while (true) {
     const data = await estadoVideo(id)
     if (onProgress) onProgress(data.status)
-
-    if (data.status === 'complete') {
-      return data.downloads?.[0]?.url || null
-    }
-    if (data.status === 'error') {
-      throw new Error(data.error?.message || 'Error generando video')
-    }
-    if (data.status === 'canceled') {
-      throw new Error('Video cancelado')
-    }
-
+    if (data.status === 'complete') return data.downloads?.[0]?.url || null
+    if (data.status === 'error') throw new Error(data.error?.message || 'Error generando video')
+    if (data.status === 'canceled') throw new Error('Video cancelado')
     const delay = DELAYS[Math.min(attempt, DELAYS.length - 1)]
     await new Promise(r => setTimeout(r, delay))
     attempt++

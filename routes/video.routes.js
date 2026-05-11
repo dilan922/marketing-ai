@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
-import { crearVideo, uploadImage, esperarVideo, getKeysStatus } from '../services/magichour.js'
+import { crearVideo, esperarVideo, getKeysStatus } from '../services/magichour.js'
 import { generarAudio } from '../services/elevenlabs.js'
 import { transcribirConTimestamps, quemarSubtitulos, generarSRT, ffmpegDisponible } from '../services/subtitles.js'
 import { mezclarMusica } from '../services/audiomix.js'
@@ -20,24 +20,17 @@ router.post('/generate', upload.single('imagen'), async (req, res) => {
   if (!prompt) return res.status(400).json({ error: 'El prompt es obligatorio' })
 
   try {
-    // 1. Subir imagen si viene
-    let filePath = null
-    let uploadKey = null
-    if (req.file) {
-      const ext = req.file.mimetype.split('/')[1] || 'jpg'
-      const uploaded = await uploadImage(req.file.buffer, ext)
-      filePath = uploaded.filePath
-      uploadKey = uploaded.key
-    }
+    // Upload + creación de video en un solo paso con retry automático por key
+    const imageBuffer = req.file ? req.file.buffer : null
+    const imageExt = req.file ? (req.file.mimetype.split('/')[1] || 'jpg') : 'jpg'
 
-    // 2. Crear video con la misma key usada para subir la imagen
     const { id } = await crearVideo({
       prompt,
-      filePath,
+      imageBuffer,
+      imageExt,
       duracion: Math.min(Math.max(parseInt(duracion), 1), 60),
       modelo,
       aspectRatio,
-      uploadKey,
     })
 
     res.json({ ok: true, jobId: id, mensaje: 'Video en cola, consultando estado...' })
