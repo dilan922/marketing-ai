@@ -9,9 +9,7 @@ const execAsync = promisify(exec)
 const SCENE_ANGLES = [
   'product hero shot, clean minimal background, studio lighting, commercial photography, 4k sharp',
   'lifestyle context, elegant environment, person using product, natural warm lighting, aspirational',
-  'macro close-up detail, premium texture and quality visible, shallow depth of field, cinematic',
-  'dramatic brand shot, artistic composition, luxury feel, dark moody background, professional',
-  'aspirational outdoor setting, golden hour lighting, product prominently featured, vibrant colors',
+  'dramatic brand shot, artistic composition, luxury feel, golden hour lighting, cinematic professional',
 ]
 
 function getDimensions(aspectRatio) {
@@ -30,8 +28,8 @@ async function fetchImage(prompt, w, h) {
 
 export async function crearSlideshowVideo({ prompt, duracion = 30, aspectRatio = '9:16' }) {
   const [w, h] = getDimensions(aspectRatio)
-  const n = 5
-  const clipDur = 6.5
+  const n = 3
+  const clipDur = 10.5
   const fadeDur = 0.5
 
   const tmpDir = join(tmpdir(), `ss_${Date.now()}`)
