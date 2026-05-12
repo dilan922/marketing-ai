@@ -1,6 +1,5 @@
 const QUEUE = 'https://queue.fal.run'
 const UPLOAD = 'https://fal.run/files/upload'
-const RESET_MS = 24 * 60 * 60 * 1000
 
 const KEYS = [
   process.env.FAL_KEY_1,  process.env.FAL_KEY_2,  process.env.FAL_KEY_3,
@@ -14,11 +13,18 @@ const KEYS = [
 
 const keyState = new Map(KEYS.map(k => [k, { exhausted: false, lastUsed: 0, exhaustedAt: 0 }]))
 
+function isPastMidnight(exhaustedAt) {
+  const then = new Date(exhaustedAt)
+  const now = new Date()
+  return now.getFullYear() !== then.getFullYear() ||
+    now.getMonth() !== then.getMonth() ||
+    now.getDate() !== then.getDate()
+}
+
 function getAvailableKey() {
-  const now = Date.now()
   KEYS.forEach(k => {
     const s = keyState.get(k)
-    if (s.exhausted && s.exhaustedAt && (now - s.exhaustedAt) > RESET_MS) {
+    if (s.exhausted && s.exhaustedAt && isPastMidnight(s.exhaustedAt)) {
       s.exhausted = false; s.exhaustedAt = 0
     }
   })

@@ -1,5 +1,4 @@
 const BASE = 'https://api.magichour.ai/v1'
-const RESET_MS = 24 * 60 * 60 * 1000 // 24 horas
 
 const KEYS = [
   process.env.MH_KEY_1,  process.env.MH_KEY_2,  process.env.MH_KEY_3,
@@ -13,12 +12,19 @@ const KEYS = [
 
 const keyState = new Map(KEYS.map(k => [k, { exhausted: false, lastUsed: 0, exhaustedAt: 0 }]))
 
+function isPastMidnight(exhaustedAt) {
+  const then = new Date(exhaustedAt)
+  const now = new Date()
+  return now.getFullYear() !== then.getFullYear() ||
+    now.getMonth() !== then.getMonth() ||
+    now.getDate() !== then.getDate()
+}
+
 function getAvailableKey() {
-  const now = Date.now()
-  // Auto-reset keys agotadas hace más de 24h (Magic Hour renueva créditos diariamente)
+  // Auto-reset keys agotadas si ya cambió el día (Magic Hour renueva a medianoche)
   KEYS.forEach(k => {
     const s = keyState.get(k)
-    if (s.exhausted && s.exhaustedAt && (now - s.exhaustedAt) > RESET_MS) {
+    if (s.exhausted && s.exhaustedAt && isPastMidnight(s.exhaustedAt)) {
       s.exhausted = false
       s.exhaustedAt = 0
     }
