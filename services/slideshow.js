@@ -39,9 +39,14 @@ export async function crearSlideshowVideo({ prompt, duracion = 30, aspectRatio =
   const cleanup = []
 
   try {
-    console.log('[SLIDESHOW] Generando 5 imágenes en paralelo...')
+    console.log('[SLIDESHOW] Generando 5 imágenes secuencialmente...')
     const scenePrompts = SCENE_ANGLES.map(a => `${prompt}, ${a}`)
-    const buffers = await Promise.all(scenePrompts.map(p => fetchImage(p, w, h)))
+    const buffers = []
+    for (let i = 0; i < scenePrompts.length; i++) {
+      console.log(`[SLIDESHOW] Imagen ${i + 1}/5...`)
+      buffers.push(await fetchImage(scenePrompts[i], w, h))
+      if (i < scenePrompts.length - 1) await new Promise(r => setTimeout(r, 1500))
+    }
 
     const imgPaths = []
     for (let i = 0; i < buffers.length; i++) {
