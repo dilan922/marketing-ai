@@ -1073,12 +1073,11 @@ async function generarSlideshow() {
   }, 2000)
 
   try {
-    const fd = new FormData()
-    fd.append('prompt', prompt)
-    fd.append('duracion', document.getElementById('v-duracion').value)
-    fd.append('aspectRatio', videoRatio)
-
-    const res = await fetch('/api/video/slideshow', { method: 'POST', body: fd })
+    const res = await fetch('/api/video/slideshow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, duracion: document.getElementById('v-duracion').value, aspectRatio: videoRatio })
+    })
     clearInterval(progInterval)
 
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error generando slideshow') }
