@@ -7,8 +7,7 @@ import { tmpdir } from 'os'
 const execAsync = promisify(exec)
 
 const SCENE_ANGLES = [
-  'product hero shot, clean minimal background, studio lighting, commercial photography, 4k sharp',
-  'lifestyle context, elegant environment, person using product, natural warm lighting, aspirational',
+  'lifestyle context, elegant environment, product in use, natural warm lighting, aspirational commercial',
   'dramatic brand shot, artistic composition, luxury feel, golden hour lighting, cinematic professional',
 ]
 
@@ -26,10 +25,8 @@ async function fetchImage(prompt, w, h) {
   return Buffer.from(await res.arrayBuffer())
 }
 
-export async function crearSlideshowVideo({ prompt, duracion = 30, aspectRatio = '9:16' }) {
+export async function crearSlideshowVideo({ prompt, duracion = 30, aspectRatio = '9:16', productImageBuffer = null }) {
   const [w, h] = getDimensions(aspectRatio)
-  const n = 3
-  const clipDur = 10.5
   const fadeDur = 0.5
 
   const tmpDir = join(tmpdir(), `ss_${Date.now()}`)
@@ -37,14 +34,27 @@ export async function crearSlideshowVideo({ prompt, duracion = 30, aspectRatio =
   const cleanup = []
 
   try {
-    console.log('[SLIDESHOW] Generando 5 imágenes secuencialmente...')
-    const scenePrompts = SCENE_ANGLES.map(a => `${prompt}, ${a}`)
     const buffers = []
-    for (let i = 0; i < scenePrompts.length; i++) {
-      console.log(`[SLIDESHOW] Imagen ${i + 1}/5...`)
-      buffers.push(await fetchImage(scenePrompts[i], w, h))
-      if (i < scenePrompts.length - 1) await new Promise(r => setTimeout(r, 1500))
+
+    // Scene 1: product photo if provided, otherwise generate one
+    if (productImageBuffer) {
+      console.log('[SLIDESHOW] Usando foto real del producto como escena 1...')
+      buffers.push(productImageBuffer)
+    } else {
+      console.log('[SLIDESHOW] Generando escena 1...')
+      buffers.push(await fetchImage(`${prompt}, product hero shot, clean minimal background, studio lighting, commercial photography`, w, h))
+      await new Promise(r => setTimeout(r, 1500))
     }
+
+    // Scenes 2 and 3: AI generated
+    for (let i = 0; i < SCENE_ANGLES.length; i++) {
+      console.log(`[SLIDESHOW] Generando escena ${i + 2}/3...`)
+      buffers.push(await fetchImage(`${prompt}, ${SCENE_ANGLES[i]}`, w, h))
+      if (i < SCENE_ANGLES.length - 1) await new Promise(r => setTimeout(r, 1500))
+    }
+
+    const n = buffers.length // 3
+    const clipDur = parseFloat((duracion / n + fadeDur * (n - 1) / n).toFixed(2))
 
     const imgPaths = []
     for (let i = 0; i < buffers.length; i++) {
@@ -58,13 +68,11 @@ export async function crearSlideshowVideo({ prompt, duracion = 30, aspectRatio =
     const outPath = join(tmpDir, 'slideshow.mp4')
     cleanup.push(outPath)
 
-    // Scale each input stream
     let fc = imgPaths.map((_, i) =>
       `[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1,fps=25,format=yuv420p[v${i}]`
     ).join(';')
     fc += ';'
 
-    // xfade chain — offset_i = i * (clipDur - fadeDur)
     let prev = '[v0]'
     for (let i = 1; i < n; i++) {
       const offset = i * (clipDur - fadeDur)

@@ -135,7 +135,7 @@ router.post('/mix-music', async (req, res) => {
   }
 })
 
-router.post('/slideshow', async (req, res) => {
+router.post('/slideshow', upload.single('imagen'), async (req, res) => {
   const { prompt, duracion = 30, aspectRatio = '9:16' } = req.body
   if (!prompt) return res.status(400).json({ error: 'El prompt es obligatorio' })
 
@@ -144,6 +144,7 @@ router.post('/slideshow', async (req, res) => {
       prompt,
       duracion: Math.min(Math.max(parseInt(duracion), 5), 60),
       aspectRatio,
+      productImageBuffer: req.file ? req.file.buffer : null,
     })
     res.set({
       'Content-Type': 'video/mp4',
