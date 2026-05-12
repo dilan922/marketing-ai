@@ -5,6 +5,7 @@ import { crearVideoFal, estadoVideoFal, getFalKeysStatus, resetFalKeys } from '.
 import { generarAudio } from '../services/elevenlabs.js'
 import { transcribirConTimestamps, quemarSubtitulos, generarSRT, ffmpegDisponible } from '../services/subtitles.js'
 import { mezclarMusica } from '../services/audiomix.js'
+import { crearSlideshowVideo } from '../services/slideshow.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
@@ -129,6 +130,27 @@ router.post('/mix-music', async (req, res) => {
     const mixed = await mezclarMusica(videoBuffer, musicUrl)
     res.set({ 'Content-Type': 'video/mp4', 'Content-Disposition': 'attachment; filename="video_con_musica.mp4"', 'Content-Length': mixed.length })
     res.send(mixed)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/slideshow', async (req, res) => {
+  const { prompt, duracion = 30, aspectRatio = '9:16' } = req.body
+  if (!prompt) return res.status(400).json({ error: 'El prompt es obligatorio' })
+
+  try {
+    const video = await crearSlideshowVideo({
+      prompt,
+      duracion: Math.min(Math.max(parseInt(duracion), 5), 60),
+      aspectRatio,
+    })
+    res.set({
+      'Content-Type': 'video/mp4',
+      'Content-Disposition': 'attachment; filename="slideshow.mp4"',
+      'Content-Length': video.length,
+    })
+    res.send(video)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

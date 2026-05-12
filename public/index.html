@@ -855,7 +855,11 @@ input[type=range]::-webkit-slider-thumb {
       <button class="btn-music" onclick="abrirDrawerMusica()">🎵 Agregar Música de Fondo</button>
 
       <button class="btn-generate" id="btn-gen-video" onclick="generarVideo()">
-        <span>🎬 GENERAR VIDEO</span>
+        <span>🎬 GENERAR VIDEO (IA)</span>
+      </button>
+
+      <button class="btn-generate" id="btn-gen-slideshow" onclick="generarSlideshow()" style="margin-top:10px;background:linear-gradient(135deg,#059669,#10B981,#34D399);">
+        <span>🖼️ SLIDESHOW GRATIS — Sin límites</span>
       </button>
     </div>
   </div>
@@ -1044,6 +1048,59 @@ function onImageSelected(input, zoneId, nameId) {
   if (!file) return
   document.getElementById(nameId).textContent = '✅ ' + file.name
   document.getElementById(zoneId).classList.add('has-file')
+}
+
+// ── Slideshow Gratis ─────────────────────────────────────────
+async function generarSlideshow() {
+  const prompt = document.getElementById('v-prompt').value.trim()
+  if (!prompt) { toast('Escribe un prompt del producto primero', 'error'); return }
+
+  const btn = document.getElementById('btn-gen-slideshow')
+  btn.disabled = true
+  btn.querySelector('span').textContent = '⏳ Generando imágenes...'
+  setVideoStatus('loading', '🎨 Creando 5 escenas del producto con IA...')
+  document.getElementById('v-progress').classList.add('show')
+  document.getElementById('v-progress-fill').style.width = '10%'
+  document.getElementById('btn-dl-video').classList.remove('show')
+  currentVideoUrl = null
+
+  let pct = 10
+  const progInterval = setInterval(() => {
+    pct = Math.min(pct + 1.5, 85)
+    document.getElementById('v-progress-fill').style.width = pct + '%'
+    if (pct < 50) setVideoStatus('loading', '🎨 Generando escenas del producto...')
+    else { btn.querySelector('span').textContent = '⏳ Creando video...'; setVideoStatus('loading', '🎬 Uniendo escenas con transiciones...') }
+  }, 2000)
+
+  try {
+    const fd = new FormData()
+    fd.append('prompt', prompt)
+    fd.append('duracion', document.getElementById('v-duracion').value)
+    fd.append('aspectRatio', videoRatio)
+
+    const res = await fetch('/api/video/slideshow', { method: 'POST', body: fd })
+    clearInterval(progInterval)
+
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error generando slideshow') }
+
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+
+    document.getElementById('v-progress-fill').style.width = '100%'
+    setVideoStatus('success', '✅ ¡Slideshow listo!')
+    mostrarVideoPreview(url)
+    currentVideoUrl = url
+    document.getElementById('btn-dl-video').classList.add('show')
+    toast('¡Slideshow de 30s generado! 🎉', 'success')
+  } catch (err) {
+    clearInterval(progInterval)
+    setVideoStatus('error', err.message)
+    document.getElementById('v-progress').classList.remove('show')
+    toast(err.message, 'error')
+  } finally {
+    btn.disabled = false
+    btn.querySelector('span').textContent = '🖼️ SLIDESHOW GRATIS — Sin límites'
+  }
 }
 
 // ── Generar Video ───────────────────────────────────────────
